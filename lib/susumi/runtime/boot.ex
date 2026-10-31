@@ -49,6 +49,33 @@ defmodule Susumi.Runtime.Boot do
     path
   end
 
+  @doc """
+  起動前の処理を決まった順で行う。
+
+  1. 待ち受ける場合は、先にポートを確認する。使用中なら案内を出して終了する。
+  2. 自動マイグレーションが有効なら、そのあとで実行する。
+
+  先に動いている古いすすみがあるとき、DBの複製と書き換えをしないための順序。
+  `opts` の `:halt` `:sleep` `:migrate` `:port_available?` `:puts` は、テスト用に差し替えられる。
+  """
+  @spec startup!(keyword) :: :ok
+  def startup!(opts) do
+    port = Keyword.fetch!(opts, :port)
+    port_available? = Keyword.get(opts, :port_available?, &port_available?/1)
+
+    if Keyword.get(opts, :serving, false) and not port_available?.(port) do
+      Keyword.get(opts, :puts, &IO.puts/1).(
+        "ポート#{port}は、ほかのソフトが使っています。ほかのすすみを閉じるか、config.json の port を変えてください。"
+      )
+
+      Keyword.get(opts, :sleep, &Process.sleep/1).(30_000)
+      Keyword.get(opts, :halt, &System.halt/1).(1)
+    end
+
+    if Keyword.get(opts, :auto_migrate, false), do: Keyword.fetch!(opts, :migrate).()
+    :ok
+  end
+
   @doc "ポートが空いていれば true。"
   @spec port_available?(pos_integer) :: boolean
   def port_available?(port) do

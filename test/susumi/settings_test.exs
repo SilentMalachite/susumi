@@ -20,4 +20,18 @@ defmodule Susumi.SettingsTest do
     :ok = Settings.put_facility_name("あおぞら")
     assert Settings.facility_name() == "あおぞら"
   end
+
+  test "increment は未設定なら1から始まり、続けて増える" do
+    assert Settings.increment("n") == 1
+    assert Settings.increment("n") == 2
+    assert Settings.get("n", nil) == "2"
+  end
+
+  test "increment は同時に呼んでも取りこぼさない" do
+    1..20
+    |> Enum.map(fn _ -> Task.async(fn -> Settings.increment("race") end) end)
+    |> Task.await_many()
+
+    assert Settings.get("race", nil) == "20"
+  end
 end

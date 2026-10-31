@@ -36,6 +36,51 @@ defmodule Susumi.Runtime.BootTest do
     :gen_tcp.close(s)
   end
 
+  describe "startup!" do
+    defp opts(extra) do
+      me = self()
+
+      Keyword.merge(
+        [
+          port: 4000,
+          serving: true,
+          auto_migrate: true,
+          migrate: fn -> send(me, :migrated) end,
+          puts: fn msg -> send(me, {:puts, msg}) end,
+          sleep: fn ms -> send(me, {:sleep, ms}) end,
+          halt: fn code -> throw({:halted, code}) end
+        ],
+        extra
+      )
+    end
+
+    test "ポートが空いていれば、そのあとでマイグレーションする" do
+      assert :ok = Boot.startup!(opts(port_available?: fn _ -> true end))
+      assert_received :migrated
+    end
+
+    test "ポートが使用中なら、マイグレーションせずに終了する" do
+      assert catch_throw(Boot.startup!(opts(port_available?: fn _ -> false end))) == {:halted, 1}
+      assert_received {:puts, "ポート4000は" <> _}
+      assert_received {:sleep, 30_000}
+      refute_received :migrated
+    end
+
+    test "待ち受けない（serving: false）ならポートは確認しない" do
+      assert :ok =
+               Boot.startup!(
+                 opts(serving: false, port_available?: fn _ -> flunk("確認してはいけない") end)
+               )
+
+      assert_received :migrated
+    end
+
+    test "auto_migrate が false ならマイグレーションしない" do
+      assert :ok = Boot.startup!(opts(auto_migrate: false, port_available?: fn _ -> true end))
+      refute_received :migrated
+    end
+  end
+
   describe "migrate_with_backup!" do
     @describetag :tmp_dir
 

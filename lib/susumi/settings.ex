@@ -28,6 +28,25 @@ defmodule Susumi.Settings do
     :ok
   end
 
+  @doc "数値として1増やし、増やした後の値を返す。1つのSQLで行うので、同時に呼んでも取りこぼさない。"
+  @spec increment(String.t()) :: integer
+  def increment(key) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+
+    %{rows: [[value]]} =
+      Repo.query!(
+        """
+        INSERT INTO settings (key, value, inserted_at, updated_at) VALUES (?1, '1', ?2, ?2)
+        ON CONFLICT (key) DO UPDATE
+          SET value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT), updated_at = ?2
+        RETURNING value
+        """,
+        [key, now]
+      )
+
+    String.to_integer(value)
+  end
+
   @spec facility_name() :: String.t()
   def facility_name, do: get("facility_name", "")
 

@@ -14,9 +14,9 @@ defmodule SusumiWeb.CheckLive do
 
   @impl true
   def handle_event("inc", _params, socket) do
-    Settings.put("check_counter", Integer.to_string(load() + 1))
+    count = Settings.increment("check_counter")
     Phoenix.PubSub.broadcast(Susumi.PubSub, @topic, {:check_changed})
-    {:noreply, assign(socket, :count, load())}
+    {:noreply, assign(socket, :count, count)}
   end
 
   @impl true

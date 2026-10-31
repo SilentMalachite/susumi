@@ -9,22 +9,22 @@ defmodule Susumi.Application do
 
   @impl true
   def start(_type, _args) do
-    if Application.get_env(:susumi, :auto_migrate, false) do
-      Boot.migrate_with_backup!(
-        Susumi.Repo,
-        DataDir.backups_path(Application.fetch_env!(:susumi, :data_dir)),
-        NaiveDateTime.local_now()
-      )
-    end
-
     port = configured_port()
-    serving = serving?()
 
-    if serving do
-      ensure_port_free!(port)
+    Boot.startup!(
+      port: port,
+      serving: serving?(),
+      auto_migrate: Application.get_env(:susumi, :auto_migrate, false),
+      migrate: fn ->
+        Boot.migrate_with_backup!(
+          Susumi.Repo,
+          DataDir.backups_path(Application.fetch_env!(:susumi, :data_dir)),
+          NaiveDateTime.local_now()
+        )
+      end
+    )
 
-      keep_alive_under_cli()
-    end
+    if System.get_env("__BURRITO") == "1", do: keep_alive_under_cli()
 
     children = [
       SusumiWeb.Telemetry,
@@ -61,16 +61,13 @@ defmodule Susumi.Application do
   end
 
   # Burrito は `elixir start_cli` でVMを起動する。この方式は、コマンドの処理が終わると
-  # 自動でVMを止める（`--no-halt` を渡せないので `System.no_halt/1` も上書きされる）。
-  # 終了時の処理で待ち続けて、止まらないようにする。
-  # OSからの停止要求（`init:stop`）の最中は、待たずにそのまま終わる。
+  # VMを止める。`--no-halt` を渡せず、`System.no_halt/1` も上書きされる。
+  # 終了時の処理（この時点の `:init.get_status/0` は `{:starting, :started}`）で
+  # 待ち続けて、VMが止まらないようにする。
+  # Burrito の起動ファイルが `__BURRITO=1` を設定したときだけ使う。
+  # `mix run` などでアプリを起動したときに、止まらなくなるのを防ぐ。
   defp keep_alive_under_cli do
-    System.at_exit(fn _status ->
-      case :init.get_status() do
-        {:stopping, _} -> :ok
-        _ -> Process.sleep(:infinity)
-      end
-    end)
+    System.at_exit(fn _status -> Process.sleep(:infinity) end)
   end
 
   defp configured_port do
@@ -82,14 +79,5 @@ defmodule Susumi.Application do
 
   defp serving? do
     :susumi |> Application.get_env(SusumiWeb.Endpoint, []) |> Keyword.get(:server, false)
-  end
-
-  defp ensure_port_free!(port) do
-    unless Boot.port_available?(port) do
-      IO.puts("ポート#{port}は、ほかのソフトが使っています。ほかのすすみを閉じるか、config.json の port を変えてください。")
-
-      Process.sleep(30_000)
-      System.halt(1)
-    end
   end
 end
