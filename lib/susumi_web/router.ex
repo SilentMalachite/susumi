@@ -18,6 +18,7 @@ defmodule SusumiWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    live "/_check", CheckLive
   end
 
   # Other scopes may use custom stacks.

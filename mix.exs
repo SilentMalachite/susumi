@@ -10,6 +10,7 @@ defmodule Susumi.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      releases: releases(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader]
     ]
@@ -22,6 +23,24 @@ defmodule Susumi.MixProject do
     [
       mod: {Susumi.Application, []},
       extra_applications: [:logger, :runtime_tools]
+    ]
+  end
+
+  # Burrito の配布サーバーに OTP 29.1.2 の macOS 版がまだ無いため、29.1 を指定している。
+  @macos_erts "https://beam-machine-universal.b-cdn.net/OTP-29.1/macos/universal/otp_29.1_macos_universal.tar.gz?please-respect-my-bandwidth-costs=thank-you&openssl=3.5.1&musl=1.2.5"
+
+  defp releases do
+    [
+      susumi: [
+        steps: [:assemble, &Burrito.wrap/1],
+        burrito: [
+          targets: [
+            windows: [os: :windows, cpu: :x86_64],
+            macos_arm: [os: :darwin, cpu: :aarch64, custom_erts: @macos_erts],
+            macos_intel: [os: :darwin, cpu: :x86_64, custom_erts: @macos_erts]
+          ]
+        ]
+      ]
     ]
   end
 
@@ -70,7 +89,8 @@ defmodule Susumi.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:burrito, "~> 1.6"}
     ]
   end
 
