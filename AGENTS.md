@@ -51,6 +51,7 @@
 - アプリ名は `susumi` / `Susumi`。Webモジュールは `SusumiWeb`。
 - 画面の文言は日本語。利用者さん向けの文言はやさしい言葉で書く。
 - NIFを使う依存は、Windows・macOS向けにまとめるときの障害になる。`exqlite` 以外のNIF依存を追加する前に相談する。
+- Phoenix / LiveView の一般的な書き方は `docs/phoenix-usage-rules.md`（`mix phx.new` が生成したもの）に従う。
 
 ## よく使うコマンド
 
