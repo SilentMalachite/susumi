@@ -16,8 +16,7 @@ config :susumi, Susumi.Repo,
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
 config :susumi, SusumiWeb.Endpoint,
-  # Binding to loopback ipv4 address prevents access from other machines.
-  # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
+  # Listen on all interfaces so other PCs on the LAN can reach the dev server.
   http: [ip: {0, 0, 0, 0}],
   check_origin: false,
   code_reloader: true,
