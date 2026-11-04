@@ -147,10 +147,11 @@ git add -A && git commit -m "chore: Phoenixプロジェクト作成とデータ�
 
 ---
 
-### Task 2: 起動処理・単体実行ファイル・実機確認（スパイク、ここで一旦止まる）
+### Task 2: 起動処理・単体実行ファイル・Windows CIとmacOS実機での確認（スパイク）
 
 **Files:**
 - Create: `lib/susumi/runtime/boot.ex`, `lib/susumi/settings.ex`, `lib/susumi/settings/setting.ex`, `priv/repo/migrations/*_create_settings.exs`, `lib/susumi_web/live/check_live.ex`（Task 14で削除する）, `docs/manual/spike-checklist.md`
+- Create: `.github/workflows/windows.yml`, `.github/scripts/release-smoke.cjs`
 - Modify: `lib/susumi/application.ex`, `mix.exs`, `lib/susumi_web/router.ex`
 - Test: `test/susumi/settings_test.exs`, `test/susumi/runtime/boot_test.exs`, `test/susumi_web/live/check_live_test.exs`
 
@@ -270,23 +271,17 @@ Expected: `burrito_out/susumi_macos_arm` ができる。
 - 再起動後も数が残る。
 - 同じLANの別端末から `/_check` を開くと、数の変化がその場で反映される。
 
-- [ ] **Step 6: Windows向けにビルドし、確認手順のチェックリストを書く**
+- [ ] **Step 6: Windows向けのビルドと起動確認をCIに追加する**
 
-Run: `MIX_ENV=prod BURRITO_TARGET=windows mix release`
-Expected: `burrito_out/susumi_windows.exe` ができる。
+`.github/workflows/windows.yml` を追加し、push・pull request・手動実行で次を確認する。
 
-macOSからのクロスビルドが `exqlite` のNIFで失敗した場合は、GitHub ActionsのWindowsランナーでのビルドを試す。結果は記録しておく。
+1. Ubuntuランナーで `mix format --check-formatted`、`mix compile --warnings-as-errors`、`mix test` を実行する。
+2. Burritoが要求する版のZig、xz、7zを用意し、`MIX_ENV=prod mix assets.deploy` と `MIX_ENV=prod BURRITO_TARGET=windows mix release` で `.exe` をクロスビルドする。BurritoはWindows上でのビルドを公式にはサポートしていない。
+3. `.exe` をartifactとしてWindowsランナーに渡す。Windows側にはElixir・Erlangを追加インストールせず、配布物を起動する。
+4. `.github/scripts/release-smoke.cjs` で、HTTP応答、データファイル作成、SQLiteへの書き込み、2画面間のLiveView同期、二重起動の案内、停止と再起動後のデータ保持を確認する。
+5. 起動ログとブラウザのトレースを、失敗時もartifactとして保存する。
 
-`docs/manual/spike-checklist.md` に、依頼者が別のWindows PCで行う確認項目を書く。
-1. ダブルクリックで起動する。SmartScreenが出たら「詳細情報 → 実行」を押す。
-2. ファイアウォールの画面が出たら「プライベートネットワーク」で許可する。管理者権限を求められたかどうかも記録する。
-3. ブラウザで画面が開く。
-4. `/_check` で数が増える。
-5. 閉じて再び起動しても数が残る。
-6. 同じLANの別PCから `http://<IP>:4000/_check` を開き、数の変化がその場で反映される。
-7. すすみを2つ同時に起動すると、2つ目にポート使用中のメッセージが出る。
-
-警告画面とファイアウォール画面は、画面写真を撮ってもらう（Task 14の手順書で使う）。
+`docs/manual/spike-checklist.md` にCIの確認項目と検証範囲外の項目を書く。Windowsの実機確認や画面写真の提供を依頼者に求めない。【2026-11-04 決定】
 
 - [ ] **Step 7: Commit**
 
@@ -294,11 +289,10 @@ macOSからのクロスビルドが `exqlite` のNIFで失敗した場合は、G
 git add -A && git commit -m "feat: 起動処理・自動マイグレーション・Burritoによる単体実行ファイル"
 ```
 
-- [ ] **Step 8: ゲート — 依頼者のWindows確認を待つ**
+- [ ] **Step 8: ゲート — Windows CIとmacOS実機確認の結果を確認する**
 
-`burrito_out/susumi_windows.exe` とチェックリストを依頼者に渡し、作業を止める。
-- 7項目がすべて通ったら、Task 3へ進む。
-- 1つでも失敗したら、Task 3以降に進まない。失敗の内容を報告し、設計書6.7の代わりの案を依頼者と相談する。
+- Windows CIとStep 5のmacOS実機確認が通ったら、Task 3へ進む。依頼者によるWindows実機確認は待たない。
+- 失敗した場合は内容を報告し、原因を修正する。配布方式の変更が必要なら、設計書6.7の代わりの案を依頼者と相談する。
 
 ---
 
@@ -1100,7 +1094,7 @@ git add -A && git commit -m "feat: 職員パスワードの復旧モード"
 **Files:**
 - Delete: `lib/susumi_web/live/check_live.ex`, `test/susumi_web/live/check_live_test.exs`（`/_check` のルートも消す）
 - Create: `docs/manual/setup-windows.md`, `docs/manual/setup-mac.md`, `docs/manual/acceptance-checklist.md`
-- Modify: `AGENTS.md`（「現在の段階」に、第1段階が完了したことを1行で書く）
+- Modify: `.github/scripts/release-smoke.cjs`（確認用カウンターを、ログイン後のカード操作による保存・同期・再起動後の保持の確認に置き換える）、`AGENTS.md`（「現在の段階」に、第1段階が完了したことを1行で書く）
 
 **Interfaces:**
 - Consumes: すべて
@@ -1121,20 +1115,20 @@ git add -A && git commit -m "feat: 職員パスワードの復旧モード"
 - 自動起動（任意。スタートアップフォルダに置く方法）
 - 職員全員がパスワードを忘れたとき（データフォルダに `recovery.txt` を置いて起動し、そのパソコンで `http://localhost:4000/recovery` を開く）
 
-画面写真は、macOSの分を実装者が撮る。Windowsの分は、Task 2のゲートで依頼者に撮ってもらったものを使う。足りない画面写真は、手順書に `（画面写真：依頼者が追加）` と書いて残す。
+画面写真は、macOSの分を実装者が撮る。Windowsの警告とファイアウォールの操作は文章で案内し、画面写真の提供は依頼者に求めない。Windows CIでは確認しない項目であることを記録する。
 
-- [ ] **Step 1: CheckLiveを削除し、`mix test` と `mix compile --warnings-as-errors` と `mix format --check-formatted` を通す**
+- [ ] **Step 1: CIの確認対象を本体機能に置き換えてCheckLiveを削除し、`mix test` と `mix compile --warnings-as-errors` と `mix format --check-formatted` を通す**
 
 Expected: 全件PASS、警告なし
 
 - [ ] **Step 2: 手順書と受け入れチェックリストを書く**
 
-`acceptance-checklist.md` には、設計書8章の受け入れ基準12項目をそのまま並べる。各項目に、確認のしかたを1行ずつ添える。
+`acceptance-checklist.md` には、設計書8章の受け入れ基準をそのまま並べる。各項目に、確認のしかたと確認環境（Windows CIまたはmacOS実機）を添える。
 
 - [ ] **Step 3: Windows・macOS向けに再ビルドし、macOSで受け入れ基準を確認する**
 
 Run: `MIX_ENV=prod mix assets.deploy && for t in windows macos_arm macos_intel; do MIX_ENV=prod BURRITO_TARGET=$t mix release; done`
-Expected: `burrito_out/` に3つの実行ファイルができる。macOSで12項目のうち、Windowsに関する項目以外がすべて通る。
+Expected: `burrito_out/` に3つの実行ファイルができる。Windows CIが成功し、macOS実機で対象の受け入れ基準がすべて通る。
 
 - [ ] **Step 4: Commit**
 
@@ -1142,6 +1136,6 @@ Expected: `burrito_out/` に3つの実行ファイルができる。macOSで12�
 git add -A && git commit -m "docs: 設置手順書と受け入れチェックリスト"
 ```
 
-- [ ] **Step 5: 依頼者にWindowsでの受け入れ確認を依頼する**
+- [ ] **Step 5: Windows CIとmacOS実機での受け入れ結果を記録する**
 
-`burrito_out/susumi_windows.exe` と `docs/manual/acceptance-checklist.md` を依頼者に渡す。結果を受け取るまで、第1段階は完了扱いにしない。
+同じコミットのWindows CI成功とmacOS実機確認の結果を `docs/manual/acceptance-checklist.md` に記録する。Windowsの検証範囲外の項目も明記する。依頼者によるWindows実機確認は完了条件に含めない。

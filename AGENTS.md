@@ -180,8 +180,9 @@ LiveViewからRepoを直接呼ばない。DB操作とPubSubのbroadcastはコン
 4. アクセス制御のテスト（利用者さんが職員の情報に触れないこと）
 5. `Phoenix.LiveViewTest` によるイベント処理のテスト、ふりがなの表示のテスト
 6. PubSubのテスト（`assert_receive`、2つ目のLiveViewへの反映）
-7. Windows・macOSでの実機確認
-   - Windowsは依頼者が別のPCで行う。実装者は確認手順のチェックリストを渡す。
+7. WindowsのCI確認とmacOSの実機確認
+   - WindowsはGitHub ActionsのWindowsランナーで単体実行ファイルを自動確認する。CIの成功を完了条件とし、依頼者の実機確認を待たない。
+   - SmartScreen、ブラウザの自動起動、施設のファイアウォール設定、別PCからのLAN接続はCIの検証範囲外として記録する。確認項目は `docs/manual/spike-checklist.md` にまとめる。
    - macOSは開発機で行う。結果を報告に書く。
 
 SQLiteのロック競合が起きた場合は `async: false` にしてよい。その場合は理由をコメントで残す。

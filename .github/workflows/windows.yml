@@ -1,0 +1,86 @@
+name: Windows CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # BurritoはWindows上でのビルドに対応していないため、Linuxからクロスビルドする。
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '29.1.2'
+          elixir-version: '1.20.5'
+      - name: Install dependencies
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get --check-locked
+      - name: Check formatting, compilation and tests
+        run: |
+          mix format --check-formatted
+          mix compile --warnings-as-errors
+          mix test
+      - name: Install Burrito build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-utils 7zip
+          zig_version=$(mix run --no-start --no-compile -e 'IO.puts(Burrito.get_versions().zig)')
+          curl --fail --location "https://ziglang.org/download/$zig_version/zig-x86_64-linux-$zig_version.tar.xz" -o "$RUNNER_TEMP/zig.tar.xz"
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-$zig_version" >> "$GITHUB_PATH"
+      - name: Build Windows executable
+        env:
+          MIX_ENV: prod
+          BURRITO_TARGET: windows
+        run: |
+          mix assets.deploy
+          mix release
+      - uses: actions/upload-artifact@v7
+        with:
+          name: susumi-windows
+          path: burrito_out/susumi_windows.exe
+          if-no-files-found: error
+
+  windows-smoke:
+    needs: build
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: susumi-windows
+          path: burrito_out
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install CI browser
+        shell: pwsh
+        run: |
+          $ciTools = Join-Path $env:RUNNER_TEMP 'susumi-ci-tools'
+          npm install --prefix $ciTools --no-save --package-lock=false playwright@1.64.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node (Join-Path $ciTools 'node_modules/playwright/cli.js') install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "NODE_PATH=$(Join-Path $ciTools 'node_modules')" >> $env:GITHUB_ENV
+      - name: Check Windows executable
+        env:
+          SMOKE_RESULTS_DIR: ${{ runner.temp }}/susumi-smoke-results
+        run: node .github/scripts/release-smoke.cjs burrito_out/susumi_windows.exe
+      - name: Save startup logs and browser traces
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-smoke-results
+          path: ${{ runner.temp }}/susumi-smoke-results
+          if-no-files-found: ignore
