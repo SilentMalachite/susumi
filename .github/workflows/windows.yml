@@ -42,6 +42,7 @@ jobs:
           MIX_ENV: prod
           BURRITO_TARGET: windows
         run: |
+          mix compile --warnings-as-errors
           mix assets.deploy
           mix release
       - uses: actions/upload-artifact@v7
